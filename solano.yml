@@ -1,0 +1,41 @@
+tests:
+  - sudo docker-compose --version
+  - sudo docker version --format '{{.Server.Version}}'
+  - echo $PATH
+
+environment:
+  'DOCKER_VERSION': '17.04.0-ce'
+  'COMPOSE_VERSION': '1.14.0'
+
+hooks:
+  pre_setup: |
+    set -o errexit -o pipefail # Exit on error
+
+    # Install Docker if desired version is not already installed
+    install_docker() {
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+      sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+      sudo apt-get update
+      sudo apt-get install docker-ce
+      mkdir -p $HOME/bin # Early in $PATH
+      (cd $HOME/bin && ln -sf /usr/bin/docker docker)
+    }
+    if ! which docker ; then
+      install_docker
+    elif [[ "$DOCKER_VERSION" != "`sudo docker version --format '{{.Server.Version}}'`" ]]; then
+      install_docker
+    fi
+
+    # Install Docker Compose if desired version is not already installed
+    install_docker_compose() {
+      sudo bash -c "curl -L https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose"
+      sudo chmod +x /usr/local/bin/docker-compose
+      mkdir -p $HOME/bin # Early in $PATH
+      (cd $HOME/bin && ln -sf /usr/local/bin/docker-compose docker-compose)
+    }
+    if [ ! -f "/usr/local/bin/docker-compose" ]; then
+      install_docker_compose
+    elif [[ "`docker-compose version --short`" != "$COMPOSE_VERSION" ]]; then
+      install_docker_compose
+    fi
+
