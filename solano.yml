@@ -1,5 +1,5 @@
 # 'solano.yml' configuration file demonstrating installing Docker and Docker-Compose
-# Requires an appropriate user-selectable worker image on Solano CI
+# Requires an appropriate worker volume (such as Ubuntu14) on to be specified Solano CI
 # (This feature is currently in beta. Contact support@solanolabs.com to activate for your organization.)
 
 # Activate the docker subsystem
