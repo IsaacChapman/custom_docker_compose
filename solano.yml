@@ -17,12 +17,13 @@ environment:
 hooks:
   pre_setup: |
     set -o errexit -o pipefail # Exit on error
+    set -x
 
     # Install Docker if desired version is not already installed
     install_docker() {
       # Stop Solano provided docker
-      if solano_docker_pid=`ps ax | grep "/solano/agent/docker daemon" | awk '{print $1}'` ; then
-        sudo kill -9 $solano_docker_pid
+      if ps ax | grep "/solano/agent/docker daemon" ; then
+        sudo kill -9 `ps ax | grep "/solano/agent/docker daemon" | awk '{print $1}'`
       fi
       sudo rm -f /usr/local/sbin/docker # Remove sym-link to installed docker
       curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
@@ -54,11 +55,12 @@ hooks:
 
   worker_setup: |
     set -o errexit -o pipefail # Exit on error
+    set -x
     # Services/daemons are restarted when workers are prepared, so if a newer version of Docker is installed it needs to be started
     if [ -f .installed-docker ]; then
       # Stop solano provided docker
-      if solano_docker_pid=`ps ax | grep "/solano/agent/docker daemon" | awk '{print $1}'` ; then
-        sudo kill -9 $solano_docker_pid
+      if ps ax | grep "/solano/agent/docker daemon" ; then
+        sudo kill -9 `ps ax | grep "/solano/agent/docker daemon" | awk '{print $1}'`
       fi
       # Start our installed docker
       sudo service docker start
