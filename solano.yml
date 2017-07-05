@@ -2,14 +2,11 @@
 # Requires an appropriate user-selectable worker image on Solano CI
 # (This feature is currently in beta. Contact support@solanolabs.com to activate for your organization.)
 
+# Activate the docker subsystem
 system:
   docker: true
 
-tests:
-  - sudo docker-compose --version
-  - sudo docker version --format '{{.Server.Version}}'
-  - echo $PATH
-
+# Specify the minimum versions of docker[-compose] required
 environment:
   'MIN_DOCKER_VERSION': '17.03.2-ce'
   'MIN_COMPOSE_VERSION': '1.14.0'
@@ -22,19 +19,24 @@ hooks:
     # Install Docker if desired version is not already installed
     install_docker() {
       # Stop Solano provided docker
-      if ps ax | grep "/solano/agent/docker daemon" ; then
-        sudo kill -9 `ps ax | grep "/solano/agent/docker daemon" | awk '{print $1}'`
+      if pgrep -u root docker ; then
+        sudo pkill -u root docker
       fi
       sudo rm -f /usr/local/sbin/docker # Remove sym-link to installed docker
+      # Install docker
       curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
       sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
       sudo apt-get update -y
       sudo apt-get install -y docker-ce
-      echo "$DOCKER_VERSION" > .installed-docker
+      # Change docker graph location to default cache path
+      sudo service docker stop
+      echo "DOCKER_OPTS='-g $HOME/docker-graph'" | sudo tee -a /etc/default/docker
+      # Note that a non-default version of docker has been installed
+      echo "`sudo docker version --format '{{.Server.Version}}'`" > .installed-docker
     }
 
     install_docker_compose() {
-      sudo bash -c "curl -L https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose"
+      sudo bash -c "curl -L https://github.com/docker/compose/releases/download/${MIN_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > /usr/local/bin/docker-compose"
       sudo chmod +x /usr/local/bin/docker-compose
     }
 
@@ -59,8 +61,8 @@ hooks:
     # Services/daemons are restarted when workers are prepared, so if a newer version of Docker is installed it needs to be started
     if [ -f .installed-docker ]; then
       # Stop solano provided docker
-      if ps ax | grep "/solano/agent/docker daemon" ; then
-        sudo kill -9 `ps ax | grep "/solano/agent/docker daemon" | awk '{print $1}'`
+      if pgrep -u root docker ; then
+        sudo pkill -u root docker
       fi
       # Start our installed docker
       sudo service docker start
@@ -69,5 +71,4 @@ hooks:
 tests:
   - sudo docker-compose --version
   - sudo docker version --format '{{.Server.Version}}'
-  - sudo docker pull postgres:latest
-  - echo $PATH
+  - sudo docker pull postgres:latest; sudo docker images
