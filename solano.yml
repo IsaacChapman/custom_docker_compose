@@ -1,3 +1,6 @@
+system:
+  docker: true
+
 tests:
   - sudo docker-compose --version
   - sudo docker version --format '{{.Server.Version}}'
