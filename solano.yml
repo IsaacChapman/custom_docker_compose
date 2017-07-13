@@ -72,3 +72,4 @@ tests:
   - sudo docker-compose --version
   - sudo docker version --format '{{.Server.Version}}'
   - sudo docker pull postgres:latest; sudo docker images
+  - echo "new_branch"
