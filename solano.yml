@@ -29,16 +29,13 @@ hooks:
       curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
       sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
       sudo apt-get update -y
-      # Install docker without starting it
-      sudo RUNLEVEL=1 apt-get install -y docker-ce
+      # Install docker and immediately stop it
+      sudo apt-get install -y docker-ce
+      sudo service docker stop
       # Change docker graph location to default cache path
       echo "DOCKER_OPTS='--data-root $HOME/docker-graph'" | sudo tee -a /etc/default/docker
-      # Fetch 'wrapdocker' to handle starting dockerd
-      mkdir -p $HOME/bin
-      curl -o $HOME/bin/wrapdocker https://github.com/jpetazzo/dind/raw/master/wrapdocker
-      chmod +x $HOME/bin/wrapdocker
-      # Start Docker
-      sudo LOG=file $HOME/bin/wrapdocker
+      # Start Docker using 'wrapdocker'
+      sudo LOG=file ./wrapdocker.sh
     }
 
     install_docker_compose() {
@@ -81,10 +78,10 @@ hooks:
     fi
 
     # Stagger worker daemon starting
-    sleep $((2 + $SOLANO_WORKER_NUM * 2))
+    sleep $((2 + SOLANO_WORKER_NUM * 2))
 
-    # Start Docker
-    sudo LOG=file $HOME/bin/wrapdocker
+    # Start Docker using 'wrapdocker'
+    sudo LOG=file ./wrapdocker.sh
 
     # CUSTOMIZE: Perform any other necessary 'worker_setup' tasks here
 
