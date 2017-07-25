@@ -34,8 +34,12 @@ hooks:
       sudo service docker stop
       # Change docker graph location to default cache path
       echo "DOCKER_OPTS='--data-root $HOME/docker-graph'" | sudo tee -a /etc/default/docker
-      # Start Docker using 'wrapdocker'
-      sudo LOG=file ./wrapdocker.sh
+      # Fetch 'wrapdocker' to handle starting dockerd
+      mkdir -p $HOME/bin
+      curl -L -o $HOME/bin/wrapdocker https://raw.githubusercontent.com/jpetazzo/dind/master/wrapdocker
+      chmod +x $HOME/bin/wrapdocker
+      # Start Docker
+      sudo LOG=file $HOME/bin/wrapdocker
     }
 
     install_docker_compose() {
@@ -80,8 +84,8 @@ hooks:
     # Stagger worker daemon starting
     sleep $((2 + SOLANO_WORKER_NUM * 2))
 
-    # Start Docker using 'wrapdocker'
-    sudo LOG=file ./wrapdocker.sh
+    # Start Docker
+    sudo LOG=file $HOME/bin/wrapdocker
 
     # CUSTOMIZE: Perform any other necessary 'worker_setup' tasks here
 
