@@ -61,15 +61,16 @@ hooks:
       install_docker_compose
     fi
 
-    # CUSTOMIZE: Perform any other necessary 'pre_setup' tasks here
+    # CUSTOMIZE: Perform any other necessary 'pre_setup' tasks here, like 'docker-compose build', 'npm install', etc.
 
     # Shutdown docker and attach logs
     if pgrep -u root docker ; then
       sudo pkill -u root docker
     fi
-    if [ -f /var/log/docker.log ]; then
+    if sudo test -f "/var/log/docker.log"; then
+      touch $HOME/results/$TDDIUM_SESSION_ID/session/docker-daemon-setup.log # to set file owner
       sudo cat /var/log/docker.log > $HOME/results/$TDDIUM_SESSION_ID/session/docker-daemon-setup.log
-      rm -f /var/log/docker.log
+      sudo rm -f /var/log/docker.log # Clear log for subsequent tasks
     fi
 
   worker_setup: |
@@ -87,19 +88,25 @@ hooks:
     # Start Docker
     sudo LOG=file $HOME/bin/wrapdocker
 
-    # CUSTOMIZE: Perform any other necessary 'worker_setup' tasks here
+    # CUSTOMIZE: Perform any other necessary 'worker_setup' tasks here, like 'docker-compose up -d'
 
   post_worker: |
     set -o errexit -o pipefail # Exit on error
     set -x
 
-    # CUSTOMIZE: Collect logs and stop docker[-compose] containers here
+    # CUSTOMIZE: Collect logs and stop docker[-compose] containers here, example:
+    # touch $HOME/results/$TDDIUM_SESSION_ID/session/docker-compose.log # to set file owner
+    # sudo docker-compose -f docker-compose.yml logs > $HOME/results/$TDDIUM_SESSION_ID/session/docker-compose.log &
+    # sleep 5 # Allow logs to be collected
+    # sudo docker-compose -f docker-compose.yml stop
+    # sleep 5 # Allow containers to stop
 
     # Shutdown docker and attach logs
     if pgrep -u root docker ; then
       sudo pkill -u root docker
     fi
-    if [ -f /var/log/docker.log ]; then
+    if sudo test -f "/var/log/docker.log"; then
+      touch $HOME/results/$TDDIUM_SESSION_ID/session/docker-daemon-worker.log # to set file owner
       sudo cat /var/log/docker.log > $HOME/results/$TDDIUM_SESSION_ID/session/docker-daemon-worker.log
     fi
 
