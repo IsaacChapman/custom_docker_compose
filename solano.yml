@@ -2,9 +2,11 @@
 # Requires an appropriate worker volume (such as Ubuntu14) on to be specified Solano CI
 # (This feature is currently in beta. Contact support@solanolabs.com to activate for your organization.)
 
-# Activate the docker subsystem
-system:
-  docker: true
+# DO NOT activate the worker's built-in docker subsystem (system.docker)
+
+# Using docker[-compose] to run multiple containers per-worker can impact performance
+# Setting 'worker_limit' to a lower value can minimize this
+worker_limit: 4
 
 # Specify the minimum versions of docker[-compose] required
 environment:
@@ -18,21 +20,26 @@ hooks:
 
     # Install Docker if desired version is not already installed
     install_docker() {
-      # Stop Solano provided docker
+      # Stop Solano provided docker if present
       if pgrep -u root docker ; then
         sudo pkill -u root docker
       fi
       sudo rm -f /usr/local/sbin/docker # Remove sym-link to installed docker
-      # Install docker
+      # Prepare to install docker
       curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
       sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
       sudo apt-get update -y
+      # Install docker and immediately stop it
       sudo apt-get install -y docker-ce
-      # Change docker graph location to default cache path
       sudo service docker stop
-      echo "DOCKER_OPTS='-g $HOME/docker-graph'" | sudo tee -a /etc/default/docker
-      # Note that a non-default version of docker has been installed
-      echo "`sudo docker version --format '{{.Server.Version}}'`" > .installed-docker
+      # Change docker graph location to default cache path
+      echo "DOCKER_OPTS='--data-root $HOME/docker-graph'" | sudo tee -a /etc/default/docker
+      # Fetch 'wrapdocker' to handle starting dockerd
+      mkdir -p $HOME/bin
+      curl -L -o $HOME/bin/wrapdocker https://raw.githubusercontent.com/jpetazzo/dind/master/wrapdocker
+      chmod +x $HOME/bin/wrapdocker
+      # Start Docker
+      sudo LOG=file $HOME/bin/wrapdocker
     }
 
     install_docker_compose() {
@@ -47,26 +54,63 @@ hooks:
       install_docker
     fi
 
-    # Install Docker Compose if it is not installed or current version isn't new enough
+    # Install Docker Compose if it is not installed or current version is not new enough
     if ! which docker-compose ; then
       install_docker_compose
     elif dpkg --compare-versions `docker-compose version --short` lt $MIN_COMPOSE_VERSION ; then
       install_docker_compose
     fi
 
+    # CUSTOMIZE: Perform any other necessary 'pre_setup' tasks here, like 'docker-compose build', 'npm install', etc.
+
+    # Shutdown docker and attach logs
+    if pgrep -u root docker ; then
+      sudo pkill -u root docker
+    fi
+    if sudo test -f "/var/log/docker.log"; then
+      touch $HOME/results/$TDDIUM_SESSION_ID/session/docker-daemon-setup.log # to set file owner
+      sudo cat /var/log/docker.log > $HOME/results/$TDDIUM_SESSION_ID/session/docker-daemon-setup.log
+      sudo rm -f /var/log/docker.log # Clear log for subsequent tasks
+    fi
 
   worker_setup: |
     set -o errexit -o pipefail # Exit on error
     set -x
-    # Services/daemons are restarted when workers are prepared, so if a newer version of Docker is installed it needs to be started
-    if [ -f .installed-docker ]; then
-      # Stop solano provided docker
-      if pgrep -u root docker ; then
-        sudo pkill -u root docker
-      fi
-      # Start our installed docker
-      sudo service docker start
+
+    # Stop Solano provided docker if present
+    if pgrep -u root docker ; then
+      sudo pkill -u root docker
     fi
+
+    # Stagger worker daemon starting
+    sleep $((2 + SOLANO_WORKER_NUM * 2))
+
+    # Start Docker
+    sudo LOG=file $HOME/bin/wrapdocker
+
+    # CUSTOMIZE: Perform any other necessary 'worker_setup' tasks here, like 'docker-compose up -d'
+
+  post_worker: |
+    set -o errexit -o pipefail # Exit on error
+    set -x
+
+    # CUSTOMIZE: Collect logs and stop docker[-compose] containers here, example:
+    # touch $HOME/results/$TDDIUM_SESSION_ID/session/docker-compose.log # to set file owner
+    # sudo docker-compose -f docker-compose.yml logs > $HOME/results/$TDDIUM_SESSION_ID/session/docker-compose.log &
+    # sleep 5 # Allow logs to be collected
+    # sudo docker-compose -f docker-compose.yml stop
+    # sleep 5 # Allow containers to stop
+
+    # Shutdown docker and attach logs
+    if pgrep -u root docker ; then
+      sudo pkill -u root docker
+    fi
+    if sudo test -f "/var/log/docker.log"; then
+      touch $HOME/results/$TDDIUM_SESSION_ID/session/docker-daemon-worker.log # to set file owner
+      sudo cat /var/log/docker.log > $HOME/results/$TDDIUM_SESSION_ID/session/docker-daemon-worker.log
+    fi
+
+
 
 tests:
   - sudo docker-compose --version
